@@ -17,9 +17,12 @@ def file_to_gcs(file_name, name, parse_dates):
     df = pd.read_csv(file_name, parse_dates=parse_dates)
 
     parquet_path = file_name.replace('.csv', '.parquet')
-    df.to_parquet(parquet_path, engine='pyarrow')
+    df.to_parquet(parquet_path,
+                  engine='pyarrow',
+                  use_deprecated_int96_timestamps=True,
+                  coerce_timestamps='ms',
+                  allow_truncated_timestamps=False)
 
-    # Inspecte les types
     pf = pq.ParquetFile(f"{name}.parquet")
     print(pf.schema)
 
@@ -55,13 +58,4 @@ OPTIONS (
 CREATE OR REPLACE TABLE `s24project.data.orders` AS
 SELECT * FROM `s24project.data.external_orders`;
 
-4/
-
-CREATE OR REPLACE TABLE `s24project.data.orders` AS
-SELECT
-  order_id,
-  TIMESTAMP_MICROS(CAST(paid_at  / 1000 AS INT64)) AS paid_at,
-  currency
-FROM
-  `s24project.data.orders`;
 """
