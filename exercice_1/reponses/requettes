@@ -1,0 +1,22 @@
+1/ Quel est le dernier statut de chaque commande ?
+
+SELECT
+  order_id,
+  status_id
+FROM (
+  SELECT
+    order_id,
+    paid_at,
+    status_id,
+    ROW_NUMBER() OVER (PARTITION BY order_id ORDER BY paid_at DESC) AS rn
+  FROM
+    `s24project.data.order_status`
+)
+WHERE rn = 1;
+
+2/ Quelle est la répartition (en nombre de produits livrés) par famille de produit ?
+
+SELECT products.product_family, count("*") as number_of_delivred_product
+FROM `s24project.data.order_items` order_items
+JOIN `s24project.data.products` products ON products.sku = order_items.sku
+GROUP BY products.product_family
