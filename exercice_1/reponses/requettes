@@ -20,3 +20,139 @@ SELECT products.product_family, count("*") as number_of_delivred_product
 FROM `s24project.data.order_items` order_items
 JOIN `s24project.data.products` products ON products.sku = order_items.sku
 GROUP BY products.product_family
+
+3/ Quel est le chiffre d’affaires en euros livré par mois de livraison ?
+
+WITH filtered_os AS (
+  SELECT *
+  FROM `data.order_status`
+  WHERE status_id = 3
+),
+
+filtered_os_currency AS (
+  SELECT
+    os.order_id,
+    os.paid_at      AS date_delivery,
+    o.currency
+  FROM filtered_os AS os
+  JOIN `data.orders` AS o
+    ON o.order_id = os.order_id
+) ,
+
+final_mappin_table AS (
+  SELECT
+  fc.order_id,
+  fc.date_delivery,
+  fc.currency,
+  COALESCE(cc.conversion_rate, 1) AS conversion_rate
+FROM filtered_os_currency AS fc
+LEFT JOIN `data.currency` AS cc
+  ON fc.currency       = cc.currency
+  AND fc.date_delivery >= cc.start_datetime
+  AND (
+    fc.date_delivery <= cc.end_datetime
+    OR cc.end_datetime IS NULL
+  )
+)
+
+SELECT EXTRACT(MONTH FROM fm.date_delivery) AS delivery_month, SUM(oi.amount*fm.conversion_rate) AS CA
+FROM final_mappin_table fm
+JOIN `data.order_items` oi ON oi.order_id = fm.order_id
+GROUP BY EXTRACT(MONTH FROM fm.date_delivery)
+ORDER BY EXTRACT(MONTH FROM fm.date_delivery)
+
+4/ Quelle est la répartition du chiffre d’affaires livré en euros par marque ?
+
+WITH filtered_os AS (
+  SELECT *
+  FROM `data.order_status`
+  WHERE status_id = 3
+),
+
+filtered_os_currency AS (
+  SELECT
+    os.order_id,
+    os.paid_at      AS date_delivery,
+    o.currency
+  FROM filtered_os AS os
+  JOIN `data.orders` AS o
+    ON o.order_id = os.order_id
+) ,
+
+final_mappin_table AS (
+  SELECT
+  fc.order_id,
+  fc.date_delivery,
+  fc.currency,
+  COALESCE(cc.conversion_rate, 1) AS conversion_rate
+FROM filtered_os_currency AS fc
+LEFT JOIN `data.currency` AS cc
+  ON fc.currency       = cc.currency
+  AND fc.date_delivery >= cc.start_datetime
+  AND (
+    fc.date_delivery <= cc.end_datetime
+    OR cc.end_datetime IS NULL
+  )
+)
+
+SELECT brand, SUM(oi.amount*fm.conversion_rate) AS CA
+FROM final_mappin_table fm
+JOIN `data.order_items` oi ON oi.order_id = fm.order_id
+JOIN `data.products` p ON p.sku = oi.sku
+GROUP BY brand
+ORDER BY CA DESC
+
+5/ Quel est le chiffre d’affaires, sur une ligne, par mois d’activité (paiement + livraison) ?
+
+WITH filtered_os AS (
+  SELECT *
+  FROM `data.order_status`
+  WHERE status_id = 3 OR status_id = 2
+),
+
+filtered_os_currency AS (
+  SELECT
+    os.order_id,
+    os.paid_at AS date_activity,
+    os.status_id,
+    o.currency
+  FROM filtered_os AS os
+  JOIN `data.orders` AS o
+    ON o.order_id = os.order_id
+) ,
+
+final_mappin_table AS (
+  SELECT
+  fc.order_id,
+  fc.date_activity,
+  fc.currency,
+  fc.status_id,
+  COALESCE(cc.conversion_rate, 1) AS conversion_rate
+FROM filtered_os_currency AS fc
+LEFT JOIN `data.currency` AS cc
+  ON fc.currency       = cc.currency
+  AND fc.date_activity >= cc.start_datetime
+  AND (
+    fc.date_activity <= cc.end_datetime
+    OR cc.end_datetime IS NULL
+  )
+)
+
+SELECT EXTRACT(YEAR FROM fm.date_activity) AS year,EXTRACT(MONTH FROM fm.date_activity) AS month, s.status_label ,SUM(ot.amount*fm.conversion_rate) AS CA
+FROM final_mappin_table fm
+JOIN data.order_items ot ON ot.order_id = fm.order_id
+JOIN data.status s ON s.status_id= fm.status_id
+GROUP BY year,month, s.status_label
+
+
+
+
+
+
+
+
+
+
+
+
+
